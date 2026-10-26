@@ -1,0 +1,55 @@
+<div class="take-plugin">
+    {% if flash %}
+        <p class="take-flash take-flash-{{ flash.type }}">{{ flash.message|t }}</p>
+    {% endif %}
+
+    {% if events|length == 0 %}
+        <p class="take-empty">{{ 'PLUGIN_TAKE.NO_EVENTS'|t }}</p>
+    {% endif %}
+
+    {% for slug, event in events %}
+        <section class="take-event" id="take-{{ slug }}">
+            <h3 class="take-event-title">{{ event.title }}<span class="take-event-date">{{ event.date }}</span></h3>
+
+            {% if event.entries|length > 0 %}
+                <ul class="take-entry-list">
+                    {% for entry in event.entries %}
+                        <li>
+                            <strong>{{ entry.name }}</strong>
+                            {% if entry.items|length > 0 %}
+                                <span class="take-items">{{ entry.items|join(', ') }}</span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="take-no-entries">{{ 'PLUGIN_TAKE.NO_ENTRIES'|t }}</p>
+            {% endif %}
+
+            <form class="take-form" method="post" action="{{ current_uri }}#take-{{ slug }}">
+                <input type="hidden" name="take_action" value="signup">
+                <input type="hidden" name="take_nonce" value="{{ nonce }}">
+                <input type="hidden" name="slug" value="{{ slug }}">
+
+                <label>
+                    {{ 'PLUGIN_TAKE.NAME'|t }}
+                    <input type="text" name="name" required>
+                </label>
+                <label>
+                    {{ 'PLUGIN_TAKE.EMAIL'|t }}
+                    <input type="email" name="email">
+                </label>
+
+                <div class="take-items-fields">
+                    <label>
+                        {{ 'PLUGIN_TAKE.ITEM'|t }}
+                        <input type="text" name="items[]">
+                    </label>
+                </div>
+                <button type="button" class="take-add-item">+ {{ 'PLUGIN_TAKE.ADD_ITEM'|t }}</button>
+
+                <button type="submit">{{ 'PLUGIN_TAKE.SUBMIT'|t }}</button>
+            </form>
+        </section>
+    {% endfor %}
+</div>

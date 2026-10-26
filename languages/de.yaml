@@ -1,0 +1,20 @@
+PLUGIN_TAKE:
+  MENU_LABEL: Feiern
+  EVENT_TITLE: Veranstaltungsname
+  EVENT_DATE: Datum
+  NEW_EVENT: Neue Feier anlegen
+  ENTRIES: Einträge
+  NO_EVENTS: Aktuell sind keine Feiern eingetragen.
+  NO_ENTRIES: Noch niemand eingetragen.
+  ADD_ENTRY: Eintrag manuell hinzufügen
+  ONE_PER_LINE: eine Zeile je Sache
+  CONFIRM_DELETE: Wirklich löschen?
+  NAME: Name
+  EMAIL: E-Mail
+  ITEM: Was bringst du mit?
+  ITEMS: Mitgebrachtes
+  ADD_ITEM: weitere Sache
+  SUBMIT: Eintragen
+  SUCCESS: Danke für deine Eintragung!
+  ERROR_INVALID: Bitte Name und Feier angeben.
+  ERROR_NONCE: Sicherheitsprüfung fehlgeschlagen, bitte Seite neu laden.

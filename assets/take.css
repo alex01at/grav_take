@@ -1,0 +1,57 @@
+.take-plugin .take-event {
+    margin-bottom: 2em;
+    padding-bottom: 1.5em;
+    border-bottom: 1px solid #ddd;
+}
+
+.take-plugin .take-event-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.take-plugin .take-event-date {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
+.take-plugin .take-entry-list {
+    list-style: none;
+    margin: 0 0 1em;
+    padding: 0;
+}
+
+.take-plugin .take-entry-list li {
+    padding: 0.25em 0;
+}
+
+.take-plugin .take-items {
+    margin-left: 0.5em;
+    opacity: 0.8;
+}
+
+.take-plugin .take-form label {
+    display: block;
+    margin-bottom: 0.5em;
+}
+
+.take-plugin .take-form input[type="text"],
+.take-plugin .take-form input[type="email"] {
+    display: block;
+    width: 100%;
+    max-width: 24em;
+}
+
+.take-plugin .take-add-item {
+    margin: 0.5em 0 1em;
+}
+
+.take-plugin .take-flash-success {
+    color: #2e7d32;
+    font-weight: bold;
+}
+
+.take-plugin .take-flash-error {
+    color: #c62828;
+    font-weight: bold;
+}
