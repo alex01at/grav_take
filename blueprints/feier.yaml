@@ -1,0 +1,36 @@
+extends@: default
+
+title: Feier
+
+form:
+  fields:
+    tabs:
+      type: tabs
+      active: 1
+      fields:
+        content:
+          type: tab
+          title: PLUGIN_ADMIN.TAB_CONTENT
+          fields:
+            date:
+              type: date
+              label: PLUGIN_TAKE.EVENT_DATE
+              validate:
+                required: true
+
+            entries:
+              type: list
+              label: PLUGIN_TAKE.ENTRIES
+              style: vertical
+              fields:
+                .name:
+                  type: text
+                  label: PLUGIN_TAKE.NAME
+
+                .email:
+                  type: text
+                  label: PLUGIN_TAKE.EMAIL
+
+                .items:
+                  type: text
+                  label: PLUGIN_TAKE.ITEMS

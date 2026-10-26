@@ -6,8 +6,8 @@ use Grav\Plugin\ShortcodeCore\Shortcode;
 use Thunder\Shortcode\Shortcode\ShortcodeInterface;
 
 /**
- * [take]            -> alle Feiern mit Liste + Anmeldeformular
- * [take slug="xyz"] -> nur eine bestimmte Feier
+ * [take]                  -> alle Feier-Seiten mit Liste + Anmeldeformular
+ * [take route="/feiern/sommerfest"] -> nur eine bestimmte Feier-Seite
  */
 class TakeShortcode extends Shortcode
 {
@@ -17,9 +17,9 @@ class TakeShortcode extends Shortcode
             $grav = Grav::instance();
             /** @var \Grav\Plugin\TakePlugin $plugin */
             $plugin = $grav['plugins']->get('take');
-            $slug = $sc->getParameter('slug');
+            $route = $sc->getParameter('route');
 
-            return $plugin ? $plugin->renderShortcode($slug) : '';
+            return $plugin ? $plugin->renderShortcode($route) : '';
         });
     }
 }
