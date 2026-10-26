@@ -1,0 +1,11 @@
+{
+    "name": "alex01at/grav-plugin-take",
+    "type": "grav-plugin",
+    "description": "Eintragungslisten für Feiern",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Grav\\Plugin\\Take\\": "classes/"
+        }
+    }
+}

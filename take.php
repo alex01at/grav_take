@@ -1,40 +1,112 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Grav\Plugin;
 
+use Composer\Autoload\ClassLoader;
 use Grav\Common\Plugin;
-use Grav\Common\Security;
+use Grav\Events\PermissionsRegisterEvent;
+use Grav\Framework\Acl\PermissionsReader;
+use Grav\Plugin\Api\PermissionResolver;
+use Grav\Plugin\Take\ApiController;
+use Grav\Plugin\Take\EntryStore;
+use RocketTheme\Toolbox\Event\Event;
 
+/**
+ * Eintragungslisten für Feiern: Feiern (Name+Datum) werden in der
+ * Plugin-Konfiguration gepflegt, das Formular erscheint überall, wo [take]
+ * im Seiteninhalt steht, Eintragungen landen als JSON in user/data/take/
+ * und werden in admin2 unter /plugin/take angezeigt.
+ */
 class TakePlugin extends Plugin
 {
+    private const MARKER = '[take]';
+
+    /** Fehler/Eingaben des aktuellen POST, damit das Formular sie wieder anzeigt. */
+    private ?string $error = null;
+    private array $posted = [];
+
     public static function getSubscribedEvents(): array
     {
         return [
             'onPluginsInitialized' => ['onPluginsInitialized', 0],
+            PermissionsRegisterEvent::class => ['onRegisterPermissions', 0],
+            // Werden nur vom `api`-Plugin (admin2) gefeuert.
+            'onApiRegisterRoutes' => ['onApiRegisterRoutes', 0],
+            'onApiSidebarItems' => ['onApiSidebarItems', 0],
+            'onApiPluginPageInfo' => ['onApiPluginPageInfo', 0],
         ];
+    }
+
+    public function autoload(): ClassLoader
+    {
+        $loader = new ClassLoader();
+        $loader->setPsr4('Grav\\Plugin\\Take\\', __DIR__ . '/classes');
+        $loader->register();
+
+        return $loader;
+    }
+
+    public function onRegisterPermissions(PermissionsRegisterEvent $event): void
+    {
+        $actions = PermissionsReader::fromYaml('plugin://' . $this->name . '/permissions.yaml');
+        $event->permissions->addActions($actions);
     }
 
     public function onPluginsInitialized(): void
     {
-        $this->enable([
-            'onTwigTemplatePaths' => ['onTwigTemplatePaths', 0],
-            'onTwigInitialized' => ['onTwigInitialized', 0],
-        ]);
-
         if ($this->isAdmin()) {
             return;
         }
 
         $this->enable([
-            'onPagesInitialized' => ['onPagesInitialized', 0],
-            'onShortcodeHandlers' => ['onShortcodeHandlers', 0],
-            'onAssetsInitialized' => ['onAssetsInitialized', 0],
+            'onPageInitialized' => ['onPageInitialized', 0],
+            'onTwigTemplatePaths' => ['onTwigTemplatePaths', 0],
+            'onOutputGenerated' => ['onOutputGenerated', 0],
         ]);
     }
 
-    public function onAssetsInitialized(): void
+    /*
+     * ---------------------------------------------------------------
+     * Frontend
+     * ---------------------------------------------------------------
+     */
+
+    public function onPageInitialized(): void
     {
-        $this->grav['assets']->addCss('plugin://take/assets/take.css');
-        $this->grav['assets']->addJs('plugin://take/assets/take.js', ['loading' => 'defer']);
+        $request = $_POST;
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || ($request['take_action'] ?? '') !== 'eintragen') {
+            return;
+        }
+
+        // Honeypot gegen Spam-Bots: echte Besucher sehen das Feld nicht.
+        if (!empty($request['take_website'])) {
+            $this->redirectToSuccess();
+        }
+
+        $eventKey = (string) ($request['take_event_key'] ?? '');
+        $this->posted = [
+            'event_key' => $eventKey,
+            'name' => (string) ($request['take_name'] ?? ''),
+            'email' => (string) ($request['take_email'] ?? ''),
+            'items' => (array) ($request['take_items'] ?? []),
+        ];
+
+        $result = EntryStore::create($eventKey, $this->posted['name'], $this->posted['email'], $this->posted['items']);
+        if (isset($result['error'])) {
+            $this->error = $result['error'];
+            return;
+        }
+
+        $this->redirectToSuccess();
+    }
+
+    /** Post/Redirect/Get, damit ein Neuladen nicht doppelt einträgt. */
+    private function redirectToSuccess(): void
+    {
+        $uri = $this->grav['uri'];
+        $this->grav->redirect($uri->path() . '?eintragung=ok#take-eintragung', 303);
     }
 
     public function onTwigTemplatePaths(): void
@@ -42,105 +114,109 @@ class TakePlugin extends Plugin
         $this->grav['twig']->twig_paths[] = __DIR__ . '/templates';
     }
 
-    public function onTwigInitialized(): void
-    {
-        $this->grav['twig']->twig()->addFunction(
-            new \Twig\TwigFunction('take_render', [$this, 'renderShortcode'], ['is_safe' => ['html']])
-        );
-    }
-
     /**
-     * Anmeldeformular im Frontend verarbeiten: hängt einen Eintrag an die
-     * Frontmatter der angegebenen Feier-Seite an und speichert sie.
+     * Ersetzt den Platzhalter erst in der fertigen Ausgabe – so bleibt die
+     * Liste trotz Seiten-Cache immer aktuell.
      */
-    public function onPagesInitialized(): void
+    public function onOutputGenerated(): void
     {
-        $uri = $this->grav['uri'];
-        if ($uri->method() !== 'POST') {
+        $output = $this->grav->output;
+        if (!is_string($output) || !str_contains($output, self::MARKER)) {
             return;
         }
 
-        $post = $uri->post() ?: [];
-        if (($post['take_action'] ?? '') !== 'signup') {
-            return;
-        }
-
-        $session = $this->grav['session'];
-        $nonce = (string)($post['take_nonce'] ?? '');
-
-        if (!Security::verifyNonce($nonce, 'take-form')) {
-            $session->take_flash = ['type' => 'error', 'message' => 'PLUGIN_TAKE.ERROR_NONCE'];
-            $this->grav->redirectLangSafe($uri->path());
-            return;
-        }
-
-        $route = (string)($post['route'] ?? '');
-        $name = trim((string)($post['name'] ?? ''));
-        $email = trim((string)($post['email'] ?? ''));
-        $items = array_values((array)($post['items'] ?? []));
-        $items = array_values(array_filter(array_map('trim', $items), static function ($v) {
-            return $v !== '';
-        }));
-
-        $page = $route !== '' ? $this->grav['pages']->find($route) : null;
-
-        if (!$page || $page->template() !== 'feier' || $name === '') {
-            $session->take_flash = ['type' => 'error', 'message' => 'PLUGIN_TAKE.ERROR_INVALID'];
-            $this->grav->redirectLangSafe($uri->path());
-            return;
-        }
-
-        $header = $page->header();
-        $entries = (array)($header->entries ?? []);
-        $entries[] = [
-            'name' => $name,
-            'email' => $email,
-            'items' => implode(', ', $items),
-        ];
-        $header->entries = $entries;
-        $page->header($header);
-        $page->save();
-
-        $session->take_flash = ['type' => 'success', 'message' => 'PLUGIN_TAKE.SUCCESS'];
-        $this->grav->redirectLangSafe($uri->path());
+        $html = $this->render();
+        // Markdown packt den Platzhalter meist in einen eigenen Absatz.
+        $output = str_replace('<p>' . self::MARKER . '</p>', $html, $output);
+        $this->grav->output = str_replace(self::MARKER, $html, $output);
     }
 
-    public function onShortcodeHandlers(): void
+    public function render(): string
     {
-        $this->grav['shortcode']->registerAllShortcodes(__DIR__ . '/classes/shortcodes');
-    }
-
-    /**
-     * Rendert eine (per Route) oder alle Feiern (Formular + Liste) für den Shortcode.
-     */
-    public function renderShortcode(?string $route = null): string
-    {
-        $events = [];
-        if ($route) {
-            $page = $this->grav['pages']->find($route);
-            if ($page && $page->template() === 'feier') {
-                $events[$page->route()] = $page;
-            }
-        } else {
-            foreach ($this->grav['pages']->all() as $page) {
-                if ($page->template() === 'feier') {
-                    $events[$page->route()] = $page;
-                }
-            }
-        }
-
-        $flash = null;
-        $session = $this->grav['session'];
-        if (isset($session->take_flash)) {
-            $flash = $session->take_flash;
-            unset($session->take_flash);
-        }
-
-        return $this->grav['twig']->twig()->render('partials/take.html.twig', [
-            'events' => $events,
-            'flash' => $flash,
-            'nonce' => Security::getNonce('take-form'),
-            'current_uri' => $this->grav['uri']->path(),
+        return $this->grav['twig']->processTemplate('take/eintragung.html.twig', [
+            'events' => EntryStore::allGrouped(),
+            'success' => ($_GET['eintragung'] ?? '') === 'ok' && $this->error === null,
+            'success_text' => 'Danke für deine Eintragung!',
+            'error' => $this->error,
+            'posted' => $this->posted,
         ]);
+    }
+
+    /*
+     * ---------------------------------------------------------------
+     * admin2: Menüpunkt + Seite /plugin/take (Web Component unter
+     * admin-next/pages/take.js)
+     * ---------------------------------------------------------------
+     */
+
+    public function onApiRegisterRoutes(Event $event): void
+    {
+        $routes = $event['routes'];
+        $routes->get('/take/events', [ApiController::class, 'events']);
+        $routes->patch('/take/events/{eventKey}/{id}', [ApiController::class, 'update']);
+        $routes->delete('/take/events/{eventKey}/{id}', [ApiController::class, 'delete']);
+        $routes->get('/take/_badge', [ApiController::class, 'badge']);
+    }
+
+    public function onApiSidebarItems(Event $event): void
+    {
+        if (!$this->userCanManage($event['user'])) {
+            return;
+        }
+
+        $items = $event['items'] ?? [];
+        $items[] = [
+            'id' => 'take',
+            'plugin' => 'take',
+            'label' => 'Feiern',
+            'icon' => 'fa-glass-cheers',
+            'route' => '/plugin/take',
+            'priority' => 10,
+            'badgeEndpoint' => '/take/_badge',
+            'authorize' => ['api.take', 'api.super', 'admin.super'],
+        ];
+        $event['items'] = $items;
+    }
+
+    public function onApiPluginPageInfo(Event $event): void
+    {
+        if ((string) $event['plugin'] !== 'take' || !$this->userCanManage($event['user'])) {
+            return;
+        }
+
+        $event['definition'] = [
+            'id' => 'take',
+            'plugin' => 'take',
+            'title' => 'Feiern',
+            'icon' => 'glass-cheers',
+            'page_type' => 'component',
+            'actions' => [
+                [
+                    'id' => 'events',
+                    'label' => 'Feiern anlegen',
+                    'icon' => 'fa-pen',
+                    'navigate' => '/plugins/take',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Konten aus admin2 tragen nur `api.*`-Rechte, Konten aus dem klassischen
+     * Admin nur `admin.*` – daher beide prüfen.
+     */
+    private function userCanManage($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if ($user->authorize('admin.super')) {
+            return true;
+        }
+
+        $resolver = new PermissionResolver($this->grav['permissions'] ?? null);
+
+        return (bool) ($resolver->resolve($user, 'api.super') || $resolver->resolve($user, 'api.take')
+            || $resolver->resolve($user, 'admin.super'));
     }
 }

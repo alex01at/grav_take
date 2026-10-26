@@ -1,0 +1,54 @@
+name: Take
+slug: take
+type: plugin
+version: 0.2.0
+description: Eintragungslisten für Feiern – Feiern mit Datum im Admin pflegen, Anmeldungen (Name, Mail, Mitgebrachtes) im Frontend sammeln.
+icon: glass-cheers
+author:
+  name: Alex
+license: MIT
+
+compatibility:
+  grav: '>=1.7.0'
+  php: '>=8.1.0'
+
+dependencies:
+  - { name: grav, version: '>=1.7.0' }
+
+form:
+  validation: loose
+  fields:
+    enabled:
+      type: toggle
+      label: Plugin aktiv
+      highlight: 1
+      default: true
+      options:
+        1: PLUGIN_ADMIN.ENABLED
+        0: PLUGIN_ADMIN.DISABLED
+      validate:
+        type: bool
+
+    usage_info:
+      type: section
+      title: Verwendung
+      text: 'Schreibe <code>[take]</code> in den Inhalt einer beliebigen Seite – dort erscheinen alle unten angelegten Feiern mit Anmeldeformular. Eingetragene Teilnehmer findest du im Menüpunkt <b>Feiern</b>.'
+      markdown: false
+
+    events:
+      type: list
+      label: Feiern
+      style: vertical
+      collapsed: true
+      btnLabel: Feier hinzufügen
+      fields:
+        .name:
+          type: text
+          label: Veranstaltungsname
+          validate:
+            required: true
+        .date:
+          type: date
+          label: Datum
+          validate:
+            required: true

@@ -1,0 +1,75 @@
+<div class="take" id="take-eintragung">
+<style>
+.take{max-width:720px;margin:1.5rem 0}
+.take-event{margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid #ddd}
+.take-event h3{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 .5rem}
+.take-date{font-size:.85em;opacity:.7}
+.take-list{list-style:none;margin:0 0 1rem;padding:0}
+.take-list li{padding:.25rem 0}
+.take-items{margin-left:.5rem;opacity:.8}
+.take-form label{display:block;margin-bottom:.5rem}
+.take-form input[type=text],.take-form input[type=email]{display:block;width:100%;max-width:24rem;padding:.4rem}
+.take-add-item{margin:.25rem 0 1rem}
+.take-msg{padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem}
+.take-ok{background:#e6f4ea;color:#1e5e2f}
+.take-err{background:#fdecea;color:#8a1c1c}
+.take-hp{position:absolute;left:-9999px}
+</style>
+
+{% if success %}
+  <div class="take-msg take-ok" role="status">{{ success_text }}</div>
+{% endif %}
+
+{% if events is empty %}
+  <p>Aktuell sind keine Feiern eingetragen.</p>
+{% endif %}
+
+{% for ev in events %}
+  <div class="take-event">
+    <h3><span>{{ ev.name }}</span><span class="take-date">{{ ev.date }}</span></h3>
+
+    {% if ev.entries is not empty %}
+      <ul class="take-list">
+        {% for entry in ev.entries %}
+          <li><strong>{{ entry.name }}</strong>{% if entry.items %}<span class="take-items">{{ entry.items|join(', ') }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Noch niemand eingetragen.</p>
+    {% endif %}
+
+    {% if error and posted.event_key == ev.key %}
+      <div class="take-msg take-err" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="#take-eintragung" class="take-form">
+      <input type="hidden" name="take_action" value="eintragen">
+      <input type="hidden" name="take_event_key" value="{{ ev.key }}">
+      <div class="take-hp" aria-hidden="true">
+        <label>Website <input type="text" name="take_website" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <label>Name <input type="text" name="take_name" required value="{{ posted.event_key == ev.key ? posted.name|default('') : '' }}"></label>
+      <label>E-Mail <input type="email" name="take_email" value="{{ posted.event_key == ev.key ? posted.email|default('') : '' }}"></label>
+      <div class="take-items-fields">
+        <label>Was bringst du mit? <input type="text" name="take_items[]"></label>
+      </div>
+      <button type="button" class="take-add-item">+ weitere Sache</button>
+      <button type="submit">Eintragen</button>
+    </form>
+  </div>
+{% endfor %}
+
+<script>
+(function () {
+  document.querySelectorAll('.take-add-item').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var container = btn.previousElementSibling;
+      var first = container.querySelector('label');
+      var clone = first.cloneNode(true);
+      clone.querySelector('input').value = '';
+      container.appendChild(clone);
+    });
+  });
+})();
+</script>
+</div>

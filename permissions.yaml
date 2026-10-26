@@ -1,0 +1,4 @@
+actions:
+  api.take:
+    type: access
+    label: Feiern verwalten
